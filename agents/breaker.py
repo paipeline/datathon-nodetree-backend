@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Any, Dict
 from schemas import Node, BreakerRequest, BreakerPrompt, BreakerResponse
 from agents.llm import LiteLLMWrapper
+from uuid import uuid4
 # ------------------------------
 # AI Breaker
 # ------------------------------
@@ -105,6 +106,10 @@ Return your output in the exact JSON format:
                     response = json.loads(response)
                 except json.JSONDecodeError:
                     raise ValueError("Invalid JSON response from LLM")
+            
+            # 为每个子问题生成UUID
+            for subproblem in response.get("subProblems", []):
+                subproblem["id"] = str(uuid4())
             
             return {
                 "success": True,

@@ -113,8 +113,61 @@ class LiteLLMWrapper:
         """
         try:
             if json_mode:
-                # 在历史消息开头添加系统消息要求 JSON 格式
+                # Add system message at the beginning of the history messages to require JSON format
                 messages = [{"role": "system", "content": "Please provide all responses in JSON format."}] + messages
+            
+            response = await completion(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=max_tokens,
+                stop=stop,
+                json_mode=json_mode,
+                response_format={"type": "json_object"} if json_mode else None
+            )
+            
+            return response.choices[0].message.content
+
+        except Exception as e:
+            self.logger.error(f"Generation failed: {str(e)}")
+            raise
+
+    async def generate_with_rag(
+        self, 
+        prompt: str, 
+        context: Optional[List[str]] = None,
+        max_tokens: Optional[int] = None, 
+        stop: Optional[List[str]] = None,
+        json_mode: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Generates a response using RAG (Retrieval-Augmented Generation)
+        
+        Args:
+            prompt: Input prompt
+            context: List of relevant context documents
+            max_tokens: Maximum number of tokens to generate
+            stop: List of stop sequences
+            json_mode: Whether to force JSON format response
+            
+        Returns:
+            Dictionary containing generated text and metadata
+        """
+        try:
+            # Prepare messages
+            messages = []
+            
+            if json_mode:
+                messages.append({
+                    "role": "system", 
+                    "content": "You are a helpful assistant. Please provide your response in JSON format."
+                })
+            
+            if context:
+                context_str = "\n\nRelevant context:\n" + "\n".join(context)
+                prompt = context_str + "\n\nQuestion: " + prompt
+            
+            messages.append({"role": "user", "content": prompt})
             
             response = await completion(
                 model=self.model,
@@ -125,22 +178,16 @@ class LiteLLMWrapper:
                 response_format={"type": "json_object"} if json_mode else None
             )
             
-            return response.choices[0].message.content
+            return {
+                "content": response.choices[0].message.content,
+                "context_used": context if context else [],
+                "model": self.model
+            }
 
         except Exception as e:
-            self.logger.error(f"Generation failed: {str(e)}")
+            logging.error(f"RAG generation failed: {str(e)}")
             raise
 
-
-
-class RAGLiteLLMWrapper:
-    def __init__(self, model: str = "gpt-4o-mini", temperature: float = 0.7):
-        self.model = model
-        self.temperature = temperature
-
-    async def generate_with_rag(self, prompt: str, max_tokens: Optional[int] = None, stop: Optional[List[str]] = None) -> Dict[str, Any]:
-        #TODO
-        pass
     async def generate_with_rag_and_history(self, messages: List[Dict[str, str]], max_tokens: Optional[int] = None, stop: Optional[List[str]] = None) -> Dict[str, Any]:
         #TODO
         pass

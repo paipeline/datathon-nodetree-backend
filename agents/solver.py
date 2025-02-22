@@ -1,102 +1,152 @@
-from typing import Optional, List, Any
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
-from schemas import Node, Edge
 from agents.llm import LiteLLMWrapper
 
-# ------------------------------
-# Solver Agent
-# ------------------------------
-class SolverAgentPrompt(BaseModel):
+class SubProblem(BaseModel):
+    """Data structure for a sub-problem"""
+    title: str
+    description: str
+    objective: str
+    id: str
+
+class SolverRequest(BaseModel):
+    """Data structure for solver request"""
     traceId: Optional[str] = None
     sessionId: Optional[str] = None
-    question: str
-    contextNodes: Optional[List[Node]] = None
-    knowledgeBaseRefs: Optional[List[str]] = None
-    modelConfig: Optional[Any] = None
+    subProblem: SubProblem
+    modelConfig: Optional[Dict[str, Any]] = None
+    language: Optional[str] = "english"
 
-class SolverAgentResponse(BaseModel):
+class SolverResponse(BaseModel):
+    """Data structure for solver response"""
     success: bool
-    answer: str
-    reasoning: Optional[str] = None
-    references: Optional[List[str]] = None
-    newNodes: Optional[List[Node]] = None
-    newEdges: Optional[List[Edge]] = None
+    title: str
+    content: str
     traceId: Optional[str] = None
-    
-    
+    subProblemId: str
+
 class Solver(LiteLLMWrapper):
-    def __init__(self, model: str = "gpt-4o-mini", temperature: float = 0.7, language: str = "English"):
+    def __init__(
+        self, 
+        model: str = "gpt-4o-mini", 
+        temperature: float = 0.7,
+        language: str = "english"
+    ):
+        """
+        Initialize the solver
+        
+        Args:
+            model: Name of the LLM model to use
+            temperature: Generation temperature
+            language: Response language
+        """
         super().__init__(model=model, temperature=temperature)
         self.language = language
+
+    def _get_system_prompt(self) -> str:
+        """Get system prompt"""
+        return f"""You are a professional technical problem-solving expert. You need to:
+1. Carefully analyze the given sub-problem
+2. Provide detailed solutions, including specific code examples and markdown math formulas
+3. Organize your answer using Markdown format
+4. All answers must be in {self.language}
+"""
+
+    def _get_user_prompt(self, subProblem: SubProblem, id: str = "") -> str:
+        """
+        Generate user prompt
         
-    def _get_system_prompt(self, question: str, contextNodes: Optional[List[Node]] = None, knowledgeBaseRefs: Optional[List[str]] = None) -> str:
-        return """You are an expert problem solver and subject matter specialist. Your role is to:
-1. Analyze the given problem or subproblem carefully
-2. Provide comprehensive, detailed solutions
-3. Ensure solutions align with the overall context
-4. Present solutions in a clear, step-by-step format
-5. Include relevant code examples when necessary"""
-    
-    def _get_user_prompt(self, question: str, contextNodes: Optional[List[Node]] = None, knowledgeBaseRefs: Optional[List[str]] = None) -> str:
-        context = ""
-        if contextNodes:
-            context = "\nContext Information:\n" + "\n".join([
-                f"- {node.title}: {node.content}" for node in contextNodes
-            ])
+        Args:
+            subProblem: Sub-problem object
+            id: Optional identifier string, defaults to empty string
             
-        refs = ""
-        if knowledgeBaseRefs:
-            refs = "\nRelevant References:\n" + "\n".join([
-                f"- {ref}" for ref in knowledgeBaseRefs
-            ])
+        Returns:
+            Formatted prompt string
+        """
+        return f"""Please solve the following sub-problem:
+
+Title: {subProblem.title}
+Description: {subProblem.description}
+Objective: {subProblem.objective}
+
+Please provide a complete solution, including code examples and detailed explanations. Make sure your answer follows the format specified in the system prompt."""
+
+    async def solve_subproblem(self, request: SolverRequest) -> SolverResponse:
+        """
+        Solve a single sub-problem and return detailed solution
+        
+        Args:
+            request: Request object containing sub-problem details
             
-        return f"""Problem to solve: {question}
-{context}
-{refs}
+        Returns:
+            Solver response containing the solution
+        """
+        try:
+            system_prompt = self._get_system_prompt()
+            user_prompt = self._get_user_prompt(request.subProblem, request.traceId or "")
+            
+            solution = self.generate(
+                prompt=user_prompt,
+                system_message=system_prompt,
+                max_tokens=2000,
+                stop=None
+            )
+            
+            return SolverResponse(
+                success=True,
+                title=request.subProblem.title,
+                content=solution,
+                traceId=request.traceId,
+                subProblemId=request.subProblem.id
+            )
+            
+        except Exception as e:
+            error_msg = f"Failed to solve sub-problem: {str(e)}"
+            self.logger.error(error_msg)
+            return SolverResponse(
+                success=False,
+                title=request.subProblem.title,
+                content=error_msg,
+                traceId=request.traceId
+            )
 
-Please provide a detailed solution following these guidelines:
-1. Carefully analyze the problem
-2. Ensure the solution is consistent with the overall context
-3. Provide step-by-step instructions
-4. Include relevant code examples if needed
-5. Response must be in {self.language}
+    async def solve(self, request: SolverRequest) -> SolverResponse:
+        """
+        Main entry point to solve the problem
+        
+        Args:
+            request: Solver request
+            
+        Returns:
+            求解响应
+        """
+        return await self.solve_subproblem(request)
 
-Your solution should be thorough and practical."""
 
-    async def solve(self, prompt: SolverAgentPrompt) -> SolverAgentResponse:
-        system_prompt = self._get_system_prompt(
-            prompt.question, 
-            prompt.contextNodes,
-            prompt.knowledgeBaseRefs
-        )
-        
-        user_prompt = self._get_user_prompt(
-            prompt.question,
-            prompt.contextNodes,
-            prompt.knowledgeBaseRefs
-        )
-        
-        response = await self.chat_completion(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            model_config=prompt.modelConfig
-        )
-        
-        return SolverAgentResponse(
-            success=True,
-            answer=response,
-            traceId=prompt.traceId,
-            references=prompt.knowledgeBaseRefs
-        )
-        
-        
+# 测试代码
 if __name__ == "__main__":
     import asyncio
     
     async def main():
         solver = Solver()
-        prompt = SolverAgentPrompt(question="What is the capital of France?")
-        response = await solver.solve(prompt)
-        print(response)
+        test_subproblem = SubProblem(
+            title="Setting Up Next.js for CRUD Operations",
+            description="This sub-problem involves configuring a Next.js application to handle CRUD operations, including setting up necessary packages and creating an API route for managing expense data.",
+            objective="By establishing a foundation for CRUD operations in Next.js, this sub-problem enables the application to create, read, update, and delete expense records, fulfilling the original request for expense tracking.",
+            id="12345"
+        )
+        
+        request = SolverRequest(
+            subProblem=test_subproblem,
+            language="english"
+        )
+        
+        response = await solver.solve(request)
+        
+        if response.success:
+            print("Solution:")
+            print(response.content)
+        else:
+            print("Error:", response.content)
     
     asyncio.run(main())

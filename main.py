@@ -1,49 +1,30 @@
-from fastapi import APIRouter, HTTPException
-from typing import List, Optional
-from pydantic import BaseModel
-from agents.llm import LiteLLMWrapper
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from api.v1.api import router as api_v1_router
 
-router = APIRouter()
+app = FastAPI(
+    title="nodetree backend",
+    version="1.0.0"
+)
 
-class GenerateRequest(BaseModel):
-    prompt: str
-    system_message: Optional[str] = None
-    max_tokens: Optional[int] = None
-    stop: Optional[List[str]] = None
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-class ChatMessage(BaseModel):
-    role: str
-    content: str
+app.include_router(
+    api_v1_router,
+    prefix="/api/v1",
+    tags=["v1"]
+)
 
-class ChatRequest(BaseModel):
-    messages: List[ChatMessage]
-    max_tokens: Optional[int] = None
-    stop: Optional[List[str]] = None
+@app.get("/")
+async def root():
+    return {"message": "backend for nodetree"}
 
-@router.post("/generate")
-async def generate_response(request: GenerateRequest):
-    try:
-        llm = LiteLLMWrapper.get_instance()
-        response = await llm.generate(
-            prompt=request.prompt,
-            system_message=request.system_message,
-            max_tokens=request.max_tokens,
-            stop=request.stop
-        )
-        return response
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/chat")
-async def chat(request: ChatRequest):
-    try:
-        llm = LiteLLMWrapper.get_instance()
-        messages = [msg.dict() for msg in request.messages]
-        response = await llm.generate_with_history(
-            messages=messages,
-            max_tokens=request.max_tokens,
-            stop=request.stop
-        )
-        return response
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
