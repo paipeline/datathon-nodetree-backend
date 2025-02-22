@@ -1,7 +1,9 @@
 from pydantic import BaseModel
 from typing import Optional, List, Any, Dict
-from schemas import Node, BreakerRequest, BreakerPrompt, BreakerResponse
+# from schemas import Node, BreakerRequest, BreakerPrompt, BreakerResponse
 from agents.llm import LiteLLMWrapper
+
+
 from uuid import uuid4
 # ------------------------------
 # AI Breaker
@@ -117,6 +119,8 @@ Return your output in the exact JSON format:
                 except json.JSONDecodeError:
                     raise ValueError("Invalid JSON response from LLM")
             
+
+
             subproblems = []
             for subproblem_data in response.get("subProblems", []):
                 subproblem_data["id"] = str(uuid4())
@@ -161,10 +165,8 @@ if __name__ == "__main__":
     async def main():
         breaker = AIBreaker()
         request = BreakerRequest(
-            userId="test_user",
             originalInput="Create a web application that allows users to track their daily expenses and generate monthly reports.",
             followUpQuestion="how to perform CRUD operations in Next.js?",
-            parentId="4120412324"
         )
         response = await breaker.process_request(request)
 

@@ -2,12 +2,12 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
-
+import json
 router = APIRouter()
 
 from agents.breaker import AIBreaker, BreakerRequest
 from agents.solver import Solver, SolverRequest
-from core.autoscaling import autoscaling_solver
+from core.round_stream import round_stream
 from agents.llm import LiteLLMWrapper
 
 class SimpleLLMRequest(BaseModel):
@@ -26,7 +26,7 @@ class AutoscalingResponse(BaseModel):
 
 async def stream_solutions(problem_breakdown: Dict[str, Any]):
     try:
-        num_solvers = await autoscaling_solver(problem_breakdown)
+        num_solvers = await round_stream(problem_breakdown)
         sub_problems = problem_breakdown.get('data', {}).get('subProblems', [])
         
         for sub_problem in sub_problems:
@@ -74,15 +74,50 @@ async def problem_solver(request: SolverRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/autoscaling")
-async def autoscaling(request: BreakerRequest):
-    try:
-        breaker = AIBreaker()
-        breakdown = await breaker.process_request(request)
+
+@router.post("/round")
+async def round_stream_endpoint(request: BreakerRequest):
+    """
+    Stream endpoint for processing problems and generating solutions
+    
+    Args:
+        request: BreakerRequest containing problem details
         
+    Returns:
+        StreamingResponse containing solutions
+    """
+    try:
         return StreamingResponse(
-            stream_solutions(breakdown),
+            stream_sse_events(
+                problem=request.originalInput,
+                follow_up_question=request.followUpQuestion,
+                metadata=request.metadata
+            ),
             media_type="text/event-stream"
         )
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+async def stream_sse_events(
+    problem: str,
+    follow_up_question: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None
+):
+    """
+    Generate SSE events from the round_stream generator
+    """
+    try:
+        async for event in round_stream(
+            problem=problem,
+            follow_up_question=follow_up_question,
+            metadata=metadata
+        ):
+
+            event_type = event["event"]
+            data = json.dumps(event["data"])
+            yield f"event: {event_type}\ndata: {data}\n\n"
+            
+    except Exception as e:
+        error_data = json.dumps({"error": str(e)})
+        yield f"event: error\ndata: {error_data}\n\n"

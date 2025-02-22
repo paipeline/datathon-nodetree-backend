@@ -29,6 +29,7 @@ class Solver(LiteLLMWrapper):
         self, 
         model: str = "gpt-4o-mini", 
         temperature: float = 0.7,
+        language: str = "English"
     ):
         """
         Initialize the solver
@@ -36,9 +37,10 @@ class Solver(LiteLLMWrapper):
         Args:
             model: Name of the LLM model to use
             temperature: Generation temperature
+            language: Language for generation (default: English)
         """
         super().__init__(model=model, temperature=temperature)
-
+        self.language = language
 
     def _get_system_prompt(self) -> str:
         """Get system prompt"""
