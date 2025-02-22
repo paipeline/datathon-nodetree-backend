@@ -7,7 +7,7 @@ router = APIRouter()
 
 from agents.breaker import AIBreaker, BreakerRequest
 from agents.solver import Solver, SolverRequest
-from agents.autoscaling import autoscaling_solver
+from core.autoscaling import autoscaling_solver
 from agents.llm import LiteLLMWrapper
 
 class SimpleLLMRequest(BaseModel):

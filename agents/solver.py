@@ -12,10 +12,9 @@ class SubProblem(BaseModel):
 class SolverRequest(BaseModel):
     """Data structure for solver request"""
     traceId: Optional[str] = None
-    sessionId: Optional[str] = None
     subProblem: SubProblem
     modelConfig: Optional[Dict[str, Any]] = None
-    language: Optional[str] = "english"
+    metadata: Optional[Any] = None
 
 class SolverResponse(BaseModel):
     """Data structure for solver response"""
@@ -30,7 +29,6 @@ class Solver(LiteLLMWrapper):
         self, 
         model: str = "gpt-4o-mini", 
         temperature: float = 0.7,
-        language: str = "english"
     ):
         """
         Initialize the solver
@@ -38,10 +36,9 @@ class Solver(LiteLLMWrapper):
         Args:
             model: Name of the LLM model to use
             temperature: Generation temperature
-            language: Response language
         """
         super().__init__(model=model, temperature=temperature)
-        self.language = language
+
 
     def _get_system_prompt(self) -> str:
         """Get system prompt"""
@@ -82,6 +79,9 @@ Please provide a complete solution, including code examples and detailed explana
             Solver response containing the solution
         """
         try:
+            if request.metadata and isinstance(request.metadata, dict):
+                self.language = request.metadata.get("language", "English")
+            
             system_prompt = self._get_system_prompt()
             user_prompt = self._get_user_prompt(request.subProblem, request.traceId or "")
             
@@ -107,7 +107,8 @@ Please provide a complete solution, including code examples and detailed explana
                 success=False,
                 title=request.subProblem.title,
                 content=error_msg,
-                traceId=request.traceId
+                traceId=request.traceId,
+                subProblemId=request.subProblem.id
             )
 
     async def solve(self, request: SolverRequest) -> SolverResponse:
@@ -138,7 +139,8 @@ if __name__ == "__main__":
         
         request = SolverRequest(
             subProblem=test_subproblem,
-            language="english"
+            metadata={"language": "English"},
+            traceId="test-trace-001"
         )
         
         response = await solver.solve(request)

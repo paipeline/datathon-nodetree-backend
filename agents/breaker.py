@@ -8,12 +8,11 @@ from uuid import uuid4
 # ------------------------------
 class BreakerRequest(BaseModel):
     traceId: Optional[str] = None
-    userId: str
-    sessionId: Optional[str] = None
     originalInput: str
-    contextNodes: Optional[List[Node]] = None
+    # contextNodes: Optional[List[Node]] = None
     metadata: Optional[Any] = None
     followUpQuestion: Optional[str] = None  # user's follow-up question
+    
 
 class BreakerPrompt(BaseModel):
     systemInstructions: str
@@ -22,7 +21,7 @@ class BreakerPrompt(BaseModel):
 
 class BreakerResponse(BaseModel):
     success: bool
-    # traceId: Optional[str] = None
+    traceId: Optional[str] = None
     followUpQuestion: Optional[str] = None  # user's follow-up question
     parentId: str = None # if the node is initial node, the parentId is None, else it is the parent node id
     data: Optional[Dict] = None
@@ -30,7 +29,15 @@ class BreakerResponse(BaseModel):
     def to_dict(self) -> Dict:
         """Convert the response to a dictionary"""
         return self.model_dump()
+class subProblem(BaseModel):
+    id: str
+    title: str
+    description: str
+    objective: str
 
+    def to_dict(self) -> Dict:
+        """将子问题转换为字典格式"""
+        return self.model_dump()
 
 
 
@@ -39,10 +46,9 @@ class AIBreaker(LiteLLMWrapper):
         self,
         model: str = "gpt-4o-mini",
         temperature: float = 0.7,
-        language: str = "English"
     ):
         super().__init__(model=model, temperature=temperature)
-        self.language = language
+        self.language = "English" # default language for generation
         self.system_prompt = self._get_system_prompt()
 
     def _get_system_prompt(self, original_input: str = "", follow_up_question: Optional[str] = None) -> str:
@@ -87,6 +93,10 @@ Return your output in the exact JSON format:
             Dictionary containing the breakdown results
         """
         try:
+            # 从metadata中获取语言设置
+            if request.metadata and isinstance(request.metadata, dict):
+                self.language = request.metadata.get("language", "Chinese")
+            
             follow_up_text = f"\nFollow-up question:\n{request.followUpQuestion}" if request.followUpQuestion else ""
             
             prompt = f"Original problem: {request.originalInput}{follow_up_text}"
@@ -107,9 +117,14 @@ Return your output in the exact JSON format:
                 except json.JSONDecodeError:
                     raise ValueError("Invalid JSON response from LLM")
             
-            # 为每个子问题生成UUID
-            for subproblem in response.get("subProblems", []):
-                subproblem["id"] = str(uuid4())
+            subproblems = []
+            for subproblem_data in response.get("subProblems", []):
+                subproblem_data["id"] = str(uuid4())
+                subproblem = subProblem(**subproblem_data)
+                #TODO check subproblem type
+                subproblems.append(subproblem.to_dict())
+            
+            response["subProblems"] = subproblems
             
             return {
                 "success": True,

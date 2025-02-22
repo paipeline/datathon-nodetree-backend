@@ -27,8 +27,6 @@ async def autoscaling_solver(problem_breakdown: Dict[str, Any]) -> int:
     try:
         num_solvers = get_subtasks_len(problem_breakdown)
         sub_problems = problem_breakdown.get('data', {}).get('subProblems', [])
-        
-        # 创建任务列表
         tasks = []
         for sub_problem in sub_problems:
             solver = Solver()
@@ -37,8 +35,9 @@ async def autoscaling_solver(problem_breakdown: Dict[str, Any]) -> int:
                     title=sub_problem.get('title', ''),
                     description=sub_problem.get('description', ''),
                     objective=sub_problem.get('objective', ''),
-                    id=sub_problem.get('id', '')  # 确保包含id
-                )
+                    id=sub_problem.get('id', ''),
+                ),
+                metadata=problem_breakdown.get('metadata', {'language': 'English'})
             )
             tasks.append(solver.solve(request))
         
@@ -59,7 +58,8 @@ if __name__ == "__main__":
         request = BreakerRequest(
             userId="test_user",
             originalInput="Create a web application that allows users to track their daily expenses and generate monthly reports.",
-            followUpQuestion="how to perform CRUD operations in Next.js?"
+            followUpQuestion="how to perform CRUD operations in Next.js?",
+            metadata={"language": "English"}
         )
         response = await breaker.process_request(request)
         print("问题分解结果：")
@@ -76,7 +76,8 @@ if __name__ == "__main__":
                     description=sub_problem.get('description', ''),
                     objective=sub_problem.get('objective', ''),
                     id=sub_problem.get('id', '')
-                )
+                ),
+                metadata=response.get('metadata', {'language': 'zh'})
             )
             solution = await solver.solve(request)
             print(f"\n子问题: {sub_problem.get('title')}")
