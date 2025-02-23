@@ -35,7 +35,7 @@ async def get_solution_history(parent_id: str, client: AsyncIOMotorClient) -> Li
                     solution['id'] = current_id if len(current_id) == 36 else str(solution['_id'])
                 history.append(solution)
                 current_id = solution.get('parent_id')
-               #with AI generated exception 
+               #with AI generated exception and current_id 
 
                 if current_id and not len(current_id) == 36:
                     try:

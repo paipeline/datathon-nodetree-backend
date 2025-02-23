@@ -6,7 +6,7 @@ client = MongoClient("mongodb://localhost:27017/")
 db = client["aiSolutions"] 
 collection = db["solutions"]  # Collection for AI generated solutions
 
-# ------------------------ # with AI help
+# ------------------------ # with AI generation
 # 1. CREATE (Insert Solution)
 # ------------------------
 def create_solution(solution_data: Dict[str, Any]) -> str:
