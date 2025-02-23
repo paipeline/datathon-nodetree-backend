@@ -36,6 +36,7 @@ class Message(BaseModel):
 class PriorityUpdateRequest(BaseModel):
     id: str
     priority: int
+    parent_id: Optional[str] = None
 
 @router.post("/set-priority")
 async def set_priority(request: PriorityUpdateRequest):
@@ -53,29 +54,46 @@ async def set_priority(request: PriorityUpdateRequest):
         db = client['nodetree']
         collection = db['nodes']
         
-        hex_id = uuid.UUID(request.id).hex[:24]
-        object_id = ObjectId(hex_id)
+        # 处理 UUID 格式的 ID
+        try:
+            if len(request.id) == 36:  # UUID 格式
+                hex_id = uuid.UUID(request.id).hex[:24]
+                object_id = ObjectId(hex_id)
+            else:  # 已经是 24 位的 hex 格式
+                object_id = ObjectId(request.id)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid ID format: {str(e)}")
         
+        # 更新优先级
         result = await collection.update_one(
             {'_id': object_id},
             {'$set': {'priority': request.priority}}
         )
         
         if result.modified_count == 0:
-            raise HTTPException(status_code=404, detail="Node not found")
-            
+            # 检查文档是否存在
+            doc = await collection.find_one({'_id': object_id})
+            if not doc:
+                raise HTTPException(status_code=404, detail="Node not found")
+            # 如果文档存在但没有修改，可能是设置了相同的优先级
+        
+        # 获取更新后的节点
         updated_node = await collection.find_one({'_id': object_id})
         if not updated_node:
-            raise HTTPException(status_code=404, detail="Node not found")
-            
-        updated_node['id'] = request.id
-        updated_node['_id'] = updated_node['id']
+            raise HTTPException(status_code=404, detail="Node not found after update")
+        
+        # 确保返回正确的 ID 格式
+        updated_node['id'] = str(updated_node['_id'])
+        del updated_node['_id']
         
         return {
             "success": True,
             "node": updated_node
         }
         
+    except HTTPException:
+        
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -54,8 +54,12 @@ async def set_priority(request: PriorityUpdateRequest):
         db = client['nodetree']
         collection = db['nodes']
         
-        hex_id = uuid.UUID(request.id).hex[:24]
-        object_id = ObjectId(hex_id)
+        # 确保 ID 格式正确
+        try:
+            hex_id = uuid.UUID(request.id).hex[:24]
+            object_id = ObjectId(hex_id)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid ID format: {str(e)}")
         
         result = await collection.update_one(
             {'_id': object_id},
@@ -69,14 +73,17 @@ async def set_priority(request: PriorityUpdateRequest):
         if not updated_node:
             raise HTTPException(status_code=404, detail="Node not found")
             
-        updated_node['id'] = request.id
-        updated_node['_id'] = updated_node['id']
+        # 确保返回正确的 ID 格式
+        updated_node['id'] = str(updated_node['_id'])
+        del updated_node['_id']
         
         return {
             "success": True,
             "node": updated_node
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

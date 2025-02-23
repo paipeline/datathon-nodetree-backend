@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from db.database import connect_to_mongo, close_mongo_connection
+from db.database import connect_to_mongo, close_mongo_connection, get_client
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,6 +29,7 @@ app.add_middleware(
 # 然后导入和注册路由
 from api.v1.api import router as api_v1_router
 from api.v2.api import router as api_v2_router
+from api.v3.api import router as api_v3_router
 
 app.include_router(
     api_v1_router,
@@ -40,6 +41,12 @@ app.include_router(
     api_v2_router,
     prefix="/api/v2",
     tags=["v2"]
+)
+
+app.include_router(
+    api_v3_router,
+    prefix="/api/v3",
+    tags=["v3"]
 )
 
 @app.get("/")
