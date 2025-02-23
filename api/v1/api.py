@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 import json
 router = APIRouter()
@@ -10,9 +10,8 @@ from agents.solver import Solver, SolverRequest
 from core.round_stream import round_stream
 from agents.llm import LiteLLMWrapper
 
-class SimpleLLMRequest(BaseModel):
+class ChatRequest(BaseModel):
     prompt: str
-    system_message: Optional[str] = None
     max_tokens: Optional[int] = 2000
     temperature: Optional[float] = 0.7
     model: Optional[str] = "gpt-4o-mini"
@@ -24,10 +23,10 @@ class AutoscalingResponse(BaseModel):
     solutions: Dict[str, Any]
     metadata: Optional[Dict[str, Any]] = None
 
-class ChatRequest(BaseModel):
-    messages: list
-    temperature: Optional[float] = 0.7
-    model: Optional[str] = "gpt-4o-mini"
+class Message(BaseModel):
+    role: str
+    content: str
+
 
 async def stream_solutions(problem_breakdown: Dict[str, Any]):
     try:
@@ -45,18 +44,21 @@ async def stream_solutions(problem_breakdown: Dict[str, Any]):
     except Exception as e:
         yield f"data: {{'error': '{str(e)}'}}\n\n"
 
-@router.post("/simple_llm")
-async def simple_llm(request: SimpleLLMRequest):
+@router.post("/chat")
+async def chat(request: ChatRequest):
     try:
         llm = LiteLLMWrapper(
             model=request.model,
             temperature=request.temperature
         )
+
+        system_message = "When returning mathematical formulas, you need to add extra $$ symbols to wrap latex formulas"
         response = llm.generate(
             prompt=request.prompt,
-            system_message=request.system_message,
+            system_message=system_message,
             max_tokens=request.max_tokens
         )
+        
         return {"success": True, "content": response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -126,23 +128,3 @@ async def stream_sse_events(
     except Exception as e:
         error_data = json.dumps({"error": str(e)})
         yield f"event: error\ndata: {error_data}\n\n"
-
-@router.post("/chat")
-async def chat(request: ChatRequest):
-    try:
-        llm = LiteLLMWrapper(
-            model=request.model,
-            temperature=request.temperature
-        )
-        
-        system_message = {
-            "role": "system",
-            "content": "返回数学公式的时候需要额外添加$$符号包裹latex公式"
-        }
-        
-        messages = [system_message] + request.messages
-        response = llm.chat(messages=messages)
-        
-        return {"success": True, "content": response}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
