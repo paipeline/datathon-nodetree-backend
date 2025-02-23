@@ -188,13 +188,56 @@ class LiteLLMWrapper:
             logging.error(f"RAG generation failed: {str(e)}")
             raise
 
-    async def generate_with_rag_and_history(self, messages: List[Dict[str, str]], max_tokens: Optional[int] = None, stop: Optional[List[str]] = None) -> Dict[str, Any]:
-        #TODO
-        pass
+    async def generate_with_rag_and_history(
+        self,
+        messages: List[Dict[str, str]],
+        context: Optional[List[str]] = None,
+        max_tokens: Optional[int] = None,
+        stop: Optional[List[str]] = None,
+        json_mode: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Generates a response using RAG with conversation history
         
+        Args:
+            messages: List of conversation messages
+            context: List of relevant context documents
+            max_tokens: Maximum number of tokens to generate
+            stop: List of stop sequences
+            json_mode: Whether to force JSON format response
+            
+        Returns:
+            Dictionary containing generated text and metadata
+        """
+        try:
+            if json_mode:
+                messages = [{"role": "system", "content": "Please provide all responses in JSON format."}] + messages
+            
+            if context:
+                context_str = "\n\nRelevant context:\n" + "\n".join(context)
+                # Append context to the last user message
+                last_msg = messages[-1]["content"]
+                messages[-1]["content"] = context_str + "\n\nQuestion: " + last_msg
+            
+            response = await completion(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=max_tokens,
+                stop=stop,
+                response_format={"type": "json_object"} if json_mode else None
+            )
+            
+            return {
+                "content": response.choices[0].message.content,
+                "context_used": context if context else [],
+                "model": self.model
+            }
 
+        except Exception as e:
+            self.logger.error(f"RAG with history generation failed: {str(e)}")
+            raise
 
-# test
 if __name__ == "__main__":
     llm = LiteLLMWrapper()
     response = llm.generate("Hello, world!", json_mode=True)

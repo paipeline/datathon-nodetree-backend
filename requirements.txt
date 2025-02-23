@@ -1,5 +1,7 @@
 litellm
-python-dotenv 
+python-dotenv>=1.0.0
 fastapi
 uvicorn
 cachebox
+motor>=3.3.1
+pymongo>=4.5.0
