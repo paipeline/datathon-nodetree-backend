@@ -17,7 +17,7 @@ async def round_stream(
         metadata (Optional[Dict[str, Any]]): Additional metadata
     
     Yields:
-        Dict[str, Any]: Stream of events containing breakdown and solution updates
+        Dict[str, Any]: Stream of events containing solution updates
     """
     breaker = AIBreaker()
     breaker_request = BreakerRequest(
@@ -26,13 +26,9 @@ async def round_stream(
         metadata={"language": metadata.get('language', 'English')}
     )
 
-    # 首先流式输出问题分解结果
+    # 获取问题分解但不输出
     breakdown = await breaker.process_request(breaker_request)
-    yield {
-        "event": "breakdown",
-        "data": breakdown
-    }
-
+    
     solutions = []
     sub_problems = breakdown.get('data', {}).get('subProblems', [])
     
@@ -60,18 +56,10 @@ async def round_stream(
         solutions.append(current_solution)
         
         yield {
-            "event": "solution",
+            "event": "solver_output",
             "data": current_solution
         }
-    
 
-    yield {
-        "event": "complete",
-        "data": {
-            'breakdown': breakdown,
-            'solutions': solutions
-        }
-    }
 
 if __name__ == "__main__":
     async def main():

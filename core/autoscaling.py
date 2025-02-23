@@ -56,3 +56,84 @@ async def autoscaling_solver_group(problem_breakdown: Dict[str, Any]) -> int:
         return 0
 
     
+async def round_stream(
+    problem: str,
+    follow_up_question: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Wrapper function to process problems and generate solutions
+
+    Args:
+        problem (str): Original problem description
+        follow_up_question (Optional[str]): Optional follow-up question
+        user_id (str): User ID
+        language (str): Response language
+
+    Returns:
+        Dict[str, Any]: Dictionary containing all subproblems and solutions
+    """
+
+    breaker = AIBreaker()
+    breaker_request = BreakerRequest(
+        originalInput=problem,
+        followUpQuestion=follow_up_question,
+        metadata={"language": metadata.get('language', 'English')}
+    )
+    
+
+    breakdown = await breaker.process_request(breaker_request)
+    
+
+    solutions = []
+    sub_problems = breakdown.get('data', {}).get('subProblems', [])
+    
+    for sub_problem in sub_problems:
+        solver = Solver(language=breakdown.get('metadata', {}).get('language', metadata.get('language', 'English')))
+        solver_request = SolverRequest(
+            subProblem=SubProblem(
+                title=sub_problem.get('title', ''),
+                description=sub_problem.get('description', ''),
+                objective=sub_problem.get('objective', ''),
+                id=sub_problem.get('id', ''),
+                language=breakdown.get('metadata', {}).get('language', metadata.get('language', 'English'))
+            ),
+            metadata=breakdown.get('metadata', {'language': metadata.get('language', 'English')})
+        )
+        solution = await solver.solve(solver_request)
+        
+        solutions.append({
+            'id': sub_problem.get('id'),
+            'title': sub_problem.get('title'),
+            'description': sub_problem.get('description'),
+            'objective': sub_problem.get('objective'),
+            'solution': solution.content
+        })
+    
+    return {
+        'breakdown': breakdown,
+        'solutions': solutions
+    }
+
+if __name__ == "__main__":
+    async def main():
+        result = await round_stream(
+            problem="Create a web application that allows users to track their daily expenses and generate monthly reports.",
+            follow_up_question="how to perform CRUD operations in Next.js?",
+            metadata={"language": "English"}
+        )
+        
+        print("Problem Breakdown Results:")
+        print(result['breakdown'])
+        print(f"\nTotal sub-problems: {len(result['solutions'])}")
+        
+        print("\nSolutions:")
+        for solution in result['solutions']:
+            print(f"\nSub-problem: {solution['title']}")
+            print(f"ID: {solution['id']}")
+            print(f"Description: {solution['description']}")
+            print(f"Objective: {solution['objective']}")
+            print(f"Solution: {solution['solution']}")
+            print("-" * 80)
+
+    asyncio.run(main())
