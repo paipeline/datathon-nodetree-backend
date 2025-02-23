@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import smtplib # mail protocol
 import time
 import json
+from langchain.schema import Document
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
@@ -26,7 +27,7 @@ def scrape(keywords, limit):
         print(URL)
         pmid_list = pmc_scrapy(URL)
         pmid_total +=  pmid_list
-        print(len(pmid_total))
+        # print(len(pmid_total))
     
             
     pmid_total = pmid_total[:limit]
@@ -53,7 +54,6 @@ def pmc_scrapy(URL):
                 pid = element.find('span', class_='docsum-pmid').get_text().strip()
                 pmid_array.append(pid)
     
-    print(pmid_array, "pmid_array")
     return pmid_array
 
 
@@ -71,33 +71,56 @@ def fetch_full_text_bioc(pmids):
         dict: A dictionary mapping PMID to extracted text.
     """
     base_url = "https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_json"
-    results = {}
-
+    documents = []
     for pmid in pmids:
         url = f"{base_url}/{pmid}/unicode"
         response = requests.get(url)
 
         if response.status_code == 200:
             try:
-                data = response.json()[0]  # Parse JSON response
+                data = response.json()[0] #Parse JSON response
                 text_content = []
-                print(type(data), "data")
                 
-                # Extract text from BioC JSON structure
-                for passage in data.get("documents", [])[0].get("passages", []):
-                    text_content.append(passage.get("text", ""))
+                for document in data.get("documents", []):
+                    title = document['passages'][0]['text']
+                    authors = []
+                    for key, value in document['passages'][0].get("infons", {}).items():
+                        if key.startswith("name_"):
+                            # Extract author names
+                            author_info = value.split(";")
+                            surname = author_info[0].split(":")[1]
+                            given_name = author_info[1].split(":")[1]
+                            authors.append(f"{given_name} {surname}")
 
-                # Store concatenated full text
-                results[pmid] = "\n".join(text_content)
+
+                    for passage in document.get("passages", []):
+                        text = passage['text']
+                        if text:
+                            text_content.append(text)
+                        
+                        
+
+                documents.append(
+                        Document(
+                            page_content="\n".join(text_content),  # Store full-text from PDF
+                            metadata={
+                                "title": title,
+                                "authors": ', '.join(authors) if authors else 'Unknown Authors',
+                                "published": "published",
+                                "pdf_url": "None"
+                            }
+                    )
+                )
+
             except json.JSONDecodeError:
                 print(f"Failed to decode JSON for PMID {pmid}")
         else:
             print(f"Error fetching data for PMID {pmid} (Status Code: {response.status_code})")
 
-    return results
+    return documents
 
 
 
 
-results = scrape("covid", 50)
-print(results)
+results = scrape("covid", 2)
+print(type(results),results)
