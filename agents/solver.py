@@ -1,6 +1,13 @@
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 from agents.llm import LiteLLMWrapper
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+
+MODEL_NAME = os.getenv("MODEL_NAME")
 
 class SubProblem(BaseModel):
     """Data structure for a sub-problem"""
@@ -15,6 +22,9 @@ class SolverRequest(BaseModel):
     subProblem: SubProblem
     modelConfig: Optional[Dict[str, Any]] = None
     metadata: Optional[Any] = None
+    
+    # RAG & History
+    context: Optional[Dict] = None
 
 class SolverResponse(BaseModel):
     """Data structure for solver response"""
@@ -23,11 +33,11 @@ class SolverResponse(BaseModel):
     content: str
     traceId: Optional[str] = None
     subProblemId: str
-
+    
 class Solver(LiteLLMWrapper):
     def __init__(
         self, 
-        model: str = "gpt-4o-mini", 
+        model: str = MODEL_NAME, 
         temperature: float = 0.7,
         language: str = "English"
     ):
@@ -51,24 +61,33 @@ class Solver(LiteLLMWrapper):
 4. All answers must be in {self.language}
 """
 
-    def _get_user_prompt(self, subProblem: SubProblem, id: str = "") -> str:
+    def _get_user_prompt(self, subProblem: SubProblem, id: str = "", context: Optional[Dict] = None) -> str:
         """
         Generate user prompt
         
         Args:
             subProblem: Sub-problem object
             id: Optional identifier string, defaults to empty string
+            context: Optional context dictionary containing relevant information
             
         Returns:
             Formatted prompt string
         """
-        return f"""Please solve the following sub-problem:
+        base_prompt = f"""Please solve the following sub-problem:
 
 Title: {subProblem.title}
 Description: {subProblem.description}
-Objective: {subProblem.objective}
+Objective: {subProblem.objective}"""
 
-Please provide a complete solution, including code examples and detailed explanations. Make sure your answer follows the format specified in the system prompt."""
+        if context:
+            context_str = "\nContext Information:\n"
+            for key, value in context.items():
+                context_str += f"{key}: {value}\n"
+            base_prompt += context_str
+
+        base_prompt += "\nPlease provide a complete solution, including code examples and detailed explanations. Make sure your answer follows the format specified in the system prompt."
+        
+        return base_prompt
 
     async def solve_subproblem(self, request: SolverRequest) -> SolverResponse:
         """
@@ -85,7 +104,11 @@ Please provide a complete solution, including code examples and detailed explana
                 self.language = request.metadata.get("language", "English")
             
             system_prompt = self._get_system_prompt()
-            user_prompt = self._get_user_prompt(request.subProblem, request.traceId or "")
+            user_prompt = self._get_user_prompt(
+                request.subProblem, 
+                request.traceId or "",
+                request.context
+            )
             
             solution = self.generate(
                 prompt=user_prompt,

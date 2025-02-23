@@ -2,6 +2,13 @@ from pydantic import BaseModel
 from typing import Optional, List, Any, Dict
 from agents.llm import LiteLLMWrapper
 from uuid import uuid4
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+MODEL_NAME = os.getenv("MODEL_NAME")
+
 # ------------------------------
 # AI Breaker
 # ------------------------------
@@ -24,7 +31,7 @@ class BreakerResponse(BaseModel):
     followUpQuestion: Optional[str] = None  # user's follow-up question
     parentId: str = None # if the node is initial node, the parentId is None, else it is the parent node id
     data: Optional[Dict] = None
-
+    context: Optional[Dict] = None
     def to_dict(self) -> Dict:
         """Convert the response to a dictionary"""
         return self.model_dump()
@@ -43,7 +50,7 @@ class subProblem(BaseModel):
 class AIBreaker(LiteLLMWrapper):
     def __init__(
         self,
-        model: str = "gpt-4o-mini",
+        model: str = MODEL_NAME,
         temperature: float = 0.7,
     ):
         super().__init__(model=model, temperature=temperature)

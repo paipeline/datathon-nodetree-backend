@@ -2,13 +2,16 @@ from typing import Optional, List, Dict, Any
 from litellm import completion
 import logging
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
+
+MODEL_NAME = os.getenv("MODEL_NAME")
 
 class LiteLLMWrapper:
     def __init__(
         self, 
-        model: str = "gpt-4o-mini",
+        model: str = MODEL_NAME,
         temperature: float = 0.7,
     ):
         """
@@ -33,6 +36,7 @@ class LiteLLMWrapper:
         stop: Optional[List[str]] = None,
         json_mode: bool = False,
     ) -> str:
+
         """
         Generate a response with error handling
         
@@ -125,7 +129,6 @@ class LiteLLMWrapper:
                 json_mode=json_mode,
                 response_format={"type": "json_object"} if json_mode else None
             )
-            
             return response.choices[0].message.content
 
         except Exception as e:

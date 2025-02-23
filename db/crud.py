@@ -1,59 +1,77 @@
 from pymongo import MongoClient
+from typing import Dict, Any
 
 # Connect to MongoDB
 client = MongoClient("mongodb://localhost:27017/")  
-db = client["myDatabase"] 
-collection = db["myCollection"]  # Collection Name
+db = client["aiSolutions"] 
+collection = db["solutions"]  # Collection for AI generated solutions
 
 # ------------------------
-# 1. CREATE (Insert Data)
+# 1. CREATE (Insert Solution)
 # ------------------------
-def create_document():
-    document = {"name": "John Doe", "age": 30, "city": "New York"}
-    result = collection.insert_one(document)
-    print("Inserted Document ID:", result.inserted_id)
+def create_solution(solution_data: Dict[str, Any]) -> str:
+    """
+    Store a new solution in the database
+    
+    Args:
+        solution_data: Solution data from round_stream
+    Returns:
+        str: Inserted document ID
+    """
+    result = collection.insert_one(solution_data)
+    return str(result.inserted_id)
 
 # ------------------------
-# 2. READ (Query Data)
+# 2. READ (Query Solutions)
 # ------------------------
-def read_documents():
-    # Find one document
-    user = collection.find_one({"name": "John Doe"})
-    print("Found User:", user)
+def get_solution_by_id(solution_id: str) -> Dict[str, Any]:
+    """Get a specific solution by its ID"""
+    from bson.objectid import ObjectId
+    return collection.find_one({"_id": ObjectId(solution_id)})
 
-    # Find multiple documents
-    users = collection.find({"age": {"$gt": 25}})
-    print("Users older than 25:")
-    for user in users:
-        print(user)
+def get_solutions_by_problem_id(problem_id: str) -> list:
+    """Get all solutions for a specific problem ID"""
+    return list(collection.find({"id": problem_id}))
 
 # ------------------------
-# 3. UPDATE (Modify Data)
+# 3. UPDATE (Modify Solution)
 # ------------------------
-def update_document():
+def update_solution(solution_id: str, updates: Dict[str, Any]) -> bool:
+    """
+    Update an existing solution
+    
+    Args:
+        solution_id: ID of the solution to update
+        updates: Fields to update
+    Returns:
+        bool: True if update was successful
+    """
+    from bson.objectid import ObjectId
     result = collection.update_one(
-        {"name": "John Doe"},  # Filter
-        {"$set": {"age": 31}}   # Update
+        {"_id": ObjectId(solution_id)},
+        {"$set": updates}
     )
-    print("Matched:", result.matched_count, "Modified:", result.modified_count)
+    return result.modified_count > 0
 
 # ------------------------
-# 4. DELETE (Remove Data)
+# 4. DELETE (Remove Solution)
 # ------------------------
-def delete_document():
-    result = collection.delete_one({"name": "John Doe"})
-    print("Deleted Count:", result.deleted_count)
+def delete_solution(solution_id: str) -> bool:
+    """Delete a solution by its ID"""
+    from bson.objectid import ObjectId
+    result = collection.delete_one({"_id": ObjectId(solution_id)})
+    return result.deleted_count > 0
 
 # ------------------------
 # Run CRUD Operations
 # ------------------------
 if __name__ == "__main__":
-    create_document()      # Create
-    read_documents()       # Read
-    update_document()      # Update
-    read_documents()       # Read Again
-    delete_document()      # Delete
-    read_documents()       # Final Read
+    create_solution({"name": "John Doe", "age": 30, "city": "New York"})      # Create
+    get_solution_by_id("some_solution_id")       # Read
+    update_solution("some_solution_id", {"age": 31})      # Update
+    get_solution_by_id("some_solution_id")       # Read Again
+    delete_solution("some_solution_id")      # Delete
+    get_solution_by_id("some_solution_id")       # Final Read
 
 # Close the connection
 client.close()

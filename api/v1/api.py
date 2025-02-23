@@ -9,12 +9,18 @@ from agents.breaker import AIBreaker, BreakerRequest
 from agents.solver import Solver, SolverRequest
 from core.round_stream import round_stream
 from agents.llm import LiteLLMWrapper
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+MODEL_NAME = os.getenv("MODEL_NAME")
 
 class ChatRequest(BaseModel):
     prompt: str
     max_tokens: Optional[int] = 2000
     temperature: Optional[float] = 0.7
-    model: Optional[str] = "gpt-4o-mini"
+    model: Optional[str] = MODEL_NAME
 
 
 class AutoscalingResponse(BaseModel):
