@@ -13,6 +13,7 @@ from bson import ObjectId
 
 logger = logging.getLogger(__name__)
 
+
 def serialize_solution(solution: Dict[str, Any]) -> Dict[str, Any]:
     """
     Process the solution to ensure all fields are available
@@ -20,7 +21,7 @@ def serialize_solution(solution: Dict[str, Any]) -> Dict[str, Any]:
     # Directly return the original solution without serialization
     return solution
 
-
+#with AI generated output for streaming
 async def round_stream(
     problem: str,
     client,  # MongoDB client instance
@@ -82,7 +83,7 @@ async def round_stream(
                     "followUpQuestion": follow_up_question
                 }
             )
-            
+            #with AI generated output for solver_request
             # Get the solution
             solution = await solver.solve(solver_request)
             

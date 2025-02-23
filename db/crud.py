@@ -6,7 +6,7 @@ client = MongoClient("mongodb://localhost:27017/")
 db = client["aiSolutions"] 
 collection = db["solutions"]  # Collection for AI generated solutions
 
-# ------------------------
+# ------------------------ # with AI help
 # 1. CREATE (Insert Solution)
 # ------------------------
 def create_solution(solution_data: Dict[str, Any]) -> str:
@@ -21,7 +21,7 @@ def create_solution(solution_data: Dict[str, Any]) -> str:
     result = collection.insert_one(solution_data)
     return str(result.inserted_id)
 
-# ------------------------
+# ------------------------ # with AI help
 # 2. READ (Query Solutions)
 # ------------------------
 def get_solution_by_id(solution_id: str) -> Dict[str, Any]:
@@ -33,7 +33,7 @@ def get_solutions_by_problem_id(problem_id: str) -> list:
     """Get all solutions for a specific problem ID"""
     return list(collection.find({"id": problem_id}))
 
-# ------------------------
+# ------------------------ # with AI help
 # 3. UPDATE (Modify Solution)
 # ------------------------
 def update_solution(solution_id: str, updates: Dict[str, Any]) -> bool:
@@ -53,7 +53,7 @@ def update_solution(solution_id: str, updates: Dict[str, Any]) -> bool:
     )
     return result.modified_count > 0
 
-# ------------------------
+# ------------------------ # with AI help
 # 4. DELETE (Remove Solution)
 # ------------------------
 def delete_solution(solution_id: str) -> bool:
@@ -62,7 +62,7 @@ def delete_solution(solution_id: str) -> bool:
     result = collection.delete_one({"_id": ObjectId(solution_id)})
     return result.deleted_count > 0
 
-# ------------------------
+# ------------------------ # with AI help
 # Run CRUD Operations
 # ------------------------
 if __name__ == "__main__":

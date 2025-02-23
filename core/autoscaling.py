@@ -11,7 +11,7 @@ from agents.solver import Solver, SolverRequest, SubProblem
 from agents.breaker import AIBreaker, BreakerRequest
 from agents.llm import LiteLLMWrapper
 
-MAX_NUM_SOLVERS = 10
+MAX_NUM_SOLVERS = 3
 
 def get_subtasks_len(problem_breakdown: Dict[str, Any]) -> int:
     return len(problem_breakdown.get('data', {}).get('subProblems', []))
@@ -29,7 +29,7 @@ async def autoscaling_solver_group(problem_breakdown: Dict[str, Any]) -> int:
     try:
         num_solvers = min(get_subtasks_len(problem_breakdown), MAX_NUM_SOLVERS)
         sub_problems = problem_breakdown.get('data', {}).get('subProblems', [])
-        tasks = []
+        tasks = []#with AI generated output for tasks autosacling   
         metadata = problem_breakdown.get('metadata', {})
         if 'language' not in metadata:
             metadata['language'] = 'English'

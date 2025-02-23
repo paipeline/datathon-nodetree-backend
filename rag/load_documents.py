@@ -15,7 +15,6 @@ import PyPDF2
 
 from rag.scraper_pubMed import scrape
 
-## TODO: get the OpenAI API key from the .env file
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -47,7 +46,7 @@ def search_arxiv(query, max_results=5):
                 "summary": entry.summary,
                 "authors": ", ".join([author.name for author in entry.authors]) if "authors" in entry else "Unknown",
                 "published": entry.published[:10] if "published" in entry else "Unknown",
-                "pdf_url": entry.id.replace("http://arxiv.org/abs/", "http://arxiv.org/pdf/") + ".pdf"
+                "pdf_url": entry.id.replace("http://arxiv.org/abs/", "http://arxiv.org/pdf/") + ".pdf" #with AI generated output for pdf
             })
         
         return papers

@@ -91,16 +91,16 @@ def generate_data_store(query, max_results):
   save_to_chroma(chunks) # Save the processed data to a data store
   # return db
 
-def search_documents(query: str, k: int = 3) -> list[tuple[dict, str]]:
+def search_documents(query: str, k: int = 3) -> list[tuple[dict, str]]: # with AI generated output
     """
-    执行相似度搜索并返回最相关文档的元数据和内容。
+    Execute similarity search and return metadata and content of the most relevant documents.
 
     Args:
-        query (str): 搜索查询
-        k (int): 要返回的文档数量，默认为3
+        query (str): Search query
+        k (int): Number of documents to return, default is 3
 
     Returns:
-        list[tuple[dict, str]]: 包含(元数据, 文本内容)元组的列表
+        list[tuple[dict, str]]: List of tuples containing (metadata, text content)
     """
     retrieved_docs = db.similarity_search(query, k=k)
     results = []

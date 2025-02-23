@@ -4,7 +4,7 @@ from agents.breaker import AIBreaker, BreakerRequest
 from agents.solver import Solver, SolverRequest, SubProblem
 
 MAX_NODES = 3
-
+# schema design with AI help
 async def round_stream(
     problem: str,
     follow_up_question: Optional[str] = None,
