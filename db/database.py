@@ -18,9 +18,9 @@ async def connect_to_mongo():
     try:
         logger.info("Attempting to connect to MongoDB...")
         client = AsyncIOMotorClient(MONGODB_URL)
-        # 测试连接
+
         await client.admin.command('ping')
-        # 确保数据库和集合存在
+     
         db = client['nodetree']
         await db.create_collection('nodes', check_exists=False)
         logger.info("Successfully connected to MongoDB and initialized collections")

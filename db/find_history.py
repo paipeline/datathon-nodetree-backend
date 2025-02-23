@@ -8,14 +8,14 @@ logger = logging.getLogger(__name__)
 
 async def get_solution_history(parent_id: str, client: AsyncIOMotorClient) -> List[Dict[str, Any]]:
     """
-    递归获取解决方案历史记录
+   
     
     Args:
-        parent_id (str): 父节点id
-        client (AsyncIOMotorClient): MongoDB客户端实例
+        parent_id (str):
+        client (AsyncIOMotorClient): 
     
     Returns:
-        List[Dict[str, Any]]: 历史记录列表
+        List[Dict[str, Any]]: 
     """
     history = []
     current_id = parent_id
@@ -39,7 +39,7 @@ async def get_solution_history(parent_id: str, client: AsyncIOMotorClient) -> Li
 
                 if current_id and not len(current_id) == 36:
                     try:
-                        # 将ObjectId扩展为UUID格式
+                      
                         current_id = str(uuid.UUID(current_id + '0' * 12))
                     except ValueError:
                         logger.error(f"Error converting ObjectId to UUID: {current_id}")
@@ -60,16 +60,7 @@ async def get_solution_history(parent_id: str, client: AsyncIOMotorClient) -> Li
     return sorted_history
 
 async def save_solution(solution_data: Dict[str, Any], client: AsyncIOMotorClient) -> Optional[str]:
-    """
-    保存解决方案到数据库
-    
-    Args:
-        solution_data (Dict[str, Any]): 解决方案数据
-        client (AsyncIOMotorClient): MongoDB客户端实例
-    
-    Returns:
-        Optional[str]: 成功时返回解决方案ID，失败时返回None
-    """
+
     try:
         if 'id' not in solution_data:
             solution_data['id'] = str(uuid.uuid4())
@@ -82,7 +73,7 @@ async def save_solution(solution_data: Dict[str, Any], client: AsyncIOMotorClien
         
         logger.info(f"Attempting to save solution with ID: {solution_data['id']}")
         
-        # 保存到数据库
+
         result = await collection.replace_one(
             {'_id': solution_data['_id']},
             solution_data,
