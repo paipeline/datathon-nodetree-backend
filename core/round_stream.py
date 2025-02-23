@@ -3,6 +3,8 @@ import asyncio
 from agents.breaker import AIBreaker, BreakerRequest
 from agents.solver import Solver, SolverRequest, SubProblem
 
+MAX_NODES = 3
+
 async def round_stream(
     problem: str,
     follow_up_question: Optional[str] = None,
@@ -31,6 +33,9 @@ async def round_stream(
     solutions = []
     sub_problems = breakdown.get('data', {}).get('subProblems', [])
     
+    if len(sub_problems) > MAX_NODES:
+        sub_problems = sub_problems[:MAX_NODES]
+        
     for sub_problem in sub_problems:
         solver = Solver(language=breakdown.get('metadata', {}).get('language', metadata.get('language', 'English')))
         solver_request = SolverRequest(

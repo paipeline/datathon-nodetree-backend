@@ -15,10 +15,10 @@ import os
 load_dotenv()
 
 MODEL_NAME = os.getenv("MODEL_NAME")
-
+MAX_TOKENS = os.getenv("MAX_TOKENS")
 class ChatRequest(BaseModel):
     prompt: str
-    max_tokens: Optional[int] = 2000
+    max_tokens: Optional[int] = MAX_TOKENS
     temperature: Optional[float] = 0.7
     model: Optional[str] = MODEL_NAME
 
