@@ -2,37 +2,41 @@ from typing import Dict, Any, Optional, AsyncGenerator, List
 import asyncio
 from agents.breaker import AIBreaker, BreakerRequest
 from agents.solver import Solver, SolverRequest, SubProblem
-import datetime
-from main import get_client
+from datetime import datetime
+from db.database import get_client  # Changed to directly import from database module
 import logging
-from mongodb_client import connect_to_mongo, close_mongo_connection
 from db.find_history import get_solution_history, save_solution
 import uuid
+import json
+
+from bson import ObjectId 
 
 logger = logging.getLogger(__name__)
 
+def serialize_solution(solution: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Process the solution to ensure all fields are available
+    """
+    # Directly return the original solution without serialization
+    return solution
+
 async def round_stream(
     problem: str,
-    client,  # MongoDB客户端实例
+    client,  # MongoDB client instance
     follow_up_question: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
     parent_id: Optional[str] = None
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
-    处理问题并生成解决方案的流式包装函数
-    
-    Args:
-        problem (str): 原始问题描述
-        client: MongoDB客户端实例
-        follow_up_question (Optional[str]): 可选的后续问题
-        metadata (Optional[Dict[str, Any]]): 额外的元数据
-        parent_id (Optional[str]): 父节点ID
+    Stream processing function for generating solutions
     """
     try:
-        # 获取历史记录
+        # Retrieve history records
         solution_history = []
         if parent_id:
             solution_history = await get_solution_history(parent_id, client)
+            # No longer need to serialize history records
+            # solution_history = [serialize_solution(sol) for sol in solution_history]
         
         breaker = AIBreaker()
         breaker_request = BreakerRequest(
@@ -44,26 +48,44 @@ async def round_stream(
 
         breakdown = await breaker.process_request(breaker_request)
         
-        solutions = []
+        # Get the list of sub-problems
         sub_problems = breakdown.get('data', {}).get('subProblems', [])
-        
+        if not sub_problems:
+            # If there are no sub-problems, create a default sub-problem
+            sub_problems = [{
+                'title': 'Solution',
+                'description': problem,
+                'objective': follow_up_question or 'Provide a complete solution',
+                'id': str(uuid.uuid4())
+            }]
+
+        # Process each sub-problem
         for sub_problem in sub_problems:
-            solver = Solver(language=breakdown.get('metadata', {}).get('language', metadata.get('language', 'English')))
+            solver = Solver(
+                language=metadata.get('language', 'English')
+            )
+            
+            # Create solver request
             solver_request = SolverRequest(
                 subProblem=SubProblem(
                     title=sub_problem.get('title', ''),
                     description=sub_problem.get('description', ''),
                     objective=sub_problem.get('objective', ''),
                     id=sub_problem.get('id', ''),
-                    language=breakdown.get('metadata', {}).get('language', metadata.get('language', 'English'))
+                    language=metadata.get('language', 'English')
                 ),
-                metadata=breakdown.get('metadata', {'language': metadata.get('language', 
-                                                                         'English')}),
-                context={"solutionHistory": solution_history}
+                metadata=metadata,
+                context={
+                    "originalProblem": problem,
+                    "solutionHistory": solution_history,
+                    "followUpQuestion": follow_up_question
+                }
             )
+            
+            # Get the solution
             solution = await solver.solve(solver_request)
             
-            # 准备解决方案文档
+            # Create the current solution
             current_solution = {
                 'title': sub_problem.get('title'),
                 'description': sub_problem.get('description'),
@@ -71,106 +93,118 @@ async def round_stream(
                 'solution': solution.content,
                 'problem': problem,
                 'follow_up_question': follow_up_question,
-                'created_at': datetime.datetime.utcnow(),
+                'created_at': datetime.utcnow().isoformat(),
                 'parent_id': parent_id,
                 'metadata': metadata,
                 '_id': str(uuid.uuid4()),
                 'priority': 0
             }
             
-            # 保存到数据库并获取正确的ID
+            # Save the solution
             saved_id = await save_solution(current_solution, client)
             if saved_id:
-                current_solution['id'] = str(saved_id)
-                # 返回事件
-                yield {
+                # Ensure ObjectId is converted to string
+                current_solution['id'] = str(saved_id) if isinstance(saved_id, ObjectId) else str(saved_id)
+                current_solution['_id'] = str(current_solution['_id'])
+                
+                # Directly use the original dictionary without any conversion
+                data = {
                     "event": "solver_output",
-                    "data": current_solution
+                    "data": dict(current_solution)
                 }
+                yield data
             
     except Exception as e:
         logger.error(f"Error in round stream: {str(e)}")
-        raise
+        error_data = {
+            "error": str(e),
+            "problem": problem,
+            "follow_up_question": follow_up_question
+        }
+        yield {
+            "event": "error",
+            "data": error_data
+        }
 
 if __name__ == "__main__":
     async def main():
         client = None
         try:
-            # 设置日志级别
+            # Set log level
             logging.basicConfig(level=logging.INFO)
             
-            # 初始化数据库连接
+            # Initialize database connection
             await connect_to_mongo()
             client = get_client()
             
-            # 验证数据库连接
+            # Validate database connection
             db = client['nodetree']
             collections = await db.list_collection_names()
             print(f"Available collections: {collections}")
             
-            # 第一次调用 - 创建初始节点
-            print("\n=== 创建初始节点：基础待办事项应用 ===")
+            # First call - Create the initial node
+            print("\n=== Creating the initial node: Basic To-Do App ===")
             first_id = None
             async for event in round_stream(
-                problem="创建一个简单的待办事项应用",
+                problem="Create a simple to-do app",
                 client=client,
-                metadata={"language": "Chinese"}
+                metadata={"language": "English"}
             ):
-                print(f"\n事件类型: {event['event']}")
-                print("数据:", event['data'])
+                print(f"\nEvent type: {event['event']}")
+                print("Data:", event['data'])
                 print("-" * 80)
                 first_id = event['data']['id']
 
-            # 第二次调用 - 添加用户认证
-            print("\n=== 添加用户认证功能 ===")
+            # Second call - Add user authentication
+            print("\n=== Adding user authentication ===")
             second_id = None
             async for event in round_stream(
-                problem="如何添加用户认证功能？",
+                problem="How to add user authentication?",
                 client=client,
-                follow_up_question="需要使用什么技术栈？",
-                metadata={"language": "Chinese"},
+                follow_up_question="What technology stack is needed?",
+                metadata={"language": "English"},
                 parent_id=first_id
             ):
-                print(f"\n事件类型: {event['event']}")
-                print("数据:", event['data'])
+                print(f"\nEvent type: {event['event']}")
+                print("Data:", event['data'])
                 print("-" * 80)
                 second_id = event['data']['id']
 
-            # 第三次调用 - 添加任务分类功能
-            print("\n=== 添加任务分类功能 ===")
+            # Third call - Add task categorization
+            print("\n=== Adding task categorization ===")
             third_id = None
             async for event in round_stream(
-                problem="如何实现任务分类功能？",
+                problem="How to implement task categorization?",
                 client=client,
-                follow_up_question="如何设计数据库模型？",
-                metadata={"language": "Chinese"},
+                follow_up_question="How to design the database model?",
+                metadata={"language": "English"},
                 parent_id=second_id
             ):
-                print(f"\n事件类型: {event['event']}")
-                print("数据:", event['data'])
+                print(f"\nEvent type: {event['event']}")
+                print("Data:", event['data'])
                 print("-" * 80)
                 third_id = event['data']['id']
 
-            # 第四次调用 - 添加任务优先级
-            print("\n=== 添加任务优先级功能 ===")
+            # Fourth call - Add task priority
+            print("\n=== Adding task priority ===")
             async for event in round_stream(
-                problem="如何添加任务优先级功能？",
+                problem="How to add task priority?",
                 client=client,
-                follow_up_question="如何在界面上展示不同优先级？",
-                metadata={"language": "Chinese"},
+                follow_up_question="How to display different priorities on the interface?",
+                metadata={"language": "English"},
                 parent_id=third_id
             ):
-                print(f"\nevent: {event['event']}")
-                print("data:", event['data'])
+                print(f"\nEvent type: {event['event']}")
+                print("Data:", event['data'])
                 print("-" * 80)
 
 
-            print("\n=== 显示完整解决方案历史记录链 ===")
+            print("\n=== Displaying the complete solution history chain ===")
             history = await get_solution_history(third_id, client)
-            print("\n完整历史数据结构:")
+            print("\nComplete history data structure:")
             for idx, item in enumerate(history, 1):
-                print(f"\n解决方案 #{idx}:")
-                print("数据结构:")
+                print(f"\nSolution #{idx}:")
+                print("Data structure:")
                 print({
                     "id": item.get('id'),
                     "title": item.get('title'),
@@ -184,10 +218,10 @@ if __name__ == "__main__":
                     "metadata": item.get('metadata')
                 })
                 print("-" * 80)
-            print("history:")
+            print("History:")
             print(history)
-            # 显示历史记录的层级关系
-            print("\n解决方案层级结构:")
+            # Display the hierarchical relationship of the history records
+            print("\nSolution hierarchy structure:")
             def print_tree(items, parent_id=None, level=0):
                 for item in items:
                     if item.get('parent_id') == parent_id:
@@ -197,7 +231,7 @@ if __name__ == "__main__":
             print_tree(history)
 
         except Exception as e:
-            print(f"发生错误: {e}")
+            print(f"An error occurred: {e}")
             raise
         finally:
             if client:

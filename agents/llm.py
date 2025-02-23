@@ -7,12 +7,13 @@ import os
 load_dotenv()
 
 MODEL_NAME = os.getenv("MODEL_NAME")
-
+MAX_TOKENS = os.getenv("MAX_TOKENS")
 class LiteLLMWrapper:
     def __init__(
         self, 
         model: str = MODEL_NAME,
         temperature: float = 0.7,
+        max_tokens: Optional[int] = int(MAX_TOKENS) if MAX_TOKENS else None,
     ):
         """
         Initialize the LLM wrapper
@@ -20,9 +21,11 @@ class LiteLLMWrapper:
         Args:
             model: LLM model name
             temperature: Generation temperature (higher = more random, lower = more deterministic)
+            max_tokens: Maximum number of tokens to generate (defaults to MAX_TOKENS from env)
         """
         self.model = model
         self.temperature = temperature
+        self.max_tokens = max_tokens
         
         # Set up logging
         logging.basicConfig(level=logging.INFO)
@@ -51,15 +54,13 @@ class LiteLLMWrapper:
             Generated text content
         """
         try:
-            # Prepare message list
             messages = self._prepare_messages(prompt, system_message, json_mode)
             
-            # Call LLM to generate response
             response = completion(
                 model=self.model,
                 messages=messages,
                 temperature=self.temperature,
-                max_tokens=max_tokens,
+                max_tokens=max_tokens or self.max_tokens,
                 stop=stop,
                 response_format={"type": "json_object"} if json_mode else None
             )
@@ -124,7 +125,7 @@ class LiteLLMWrapper:
                 model=self.model,
                 messages=messages,
                 temperature=self.temperature,
-                max_tokens=max_tokens,
+                max_tokens=max_tokens or self.max_tokens,
                 stop=stop,
                 json_mode=json_mode,
                 response_format={"type": "json_object"} if json_mode else None
@@ -176,7 +177,7 @@ class LiteLLMWrapper:
                 model=self.model,
                 messages=messages,
                 temperature=self.temperature,
-                max_tokens=max_tokens,
+                max_tokens=max_tokens or self.max_tokens,
                 stop=stop,
                 response_format={"type": "json_object"} if json_mode else None
             )
@@ -226,7 +227,7 @@ class LiteLLMWrapper:
                 model=self.model,
                 messages=messages,
                 temperature=self.temperature,
-                max_tokens=max_tokens,
+                max_tokens=max_tokens or self.max_tokens,
                 stop=stop,
                 response_format={"type": "json_object"} if json_mode else None
             )

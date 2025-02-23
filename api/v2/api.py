@@ -3,18 +3,23 @@ from fastapi.responses import StreamingResponse
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 import json
-router = APIRouter()
+import os
+from dotenv import load_dotenv
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from agents.breaker import AIBreaker, BreakerRequest
 from agents.solver import Solver, SolverRequest
-from core.round_stream import round_stream
+from core.round_history_steam import round_stream
 from agents.llm import LiteLLMWrapper
-from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
+router = APIRouter()
 MODEL_NAME = os.getenv("MODEL_NAME")
+
+def get_db_client():
+    from db.database import get_client
+    return get_client()
 
 class ChatRequest(BaseModel):
     prompt: str
@@ -22,33 +27,9 @@ class ChatRequest(BaseModel):
     temperature: Optional[float] = 0.7
     model: Optional[str] = MODEL_NAME
 
-
-class AutoscalingResponse(BaseModel):
-    success: bool
-    num_solvers: int
-    solutions: Dict[str, Any]
-    metadata: Optional[Dict[str, Any]] = None
-
 class Message(BaseModel):
     role: str
     content: str
-
-
-async def stream_solutions(problem_breakdown: Dict[str, Any]):
-    try:
-        num_solvers = await round_stream(problem_breakdown)
-        sub_problems = problem_breakdown.get('data', {}).get('subProblems', [])
-        
-        for sub_problem in sub_problems:
-            solver = Solver()
-            request = SolverRequest(
-                subProblem=sub_problem
-            )
-            solution = await solver.solve(request)
-            yield f"data: {solution.json()}\n\n"
-            
-    except Exception as e:
-        yield f"data: {{'error': '{str(e)}'}}\n\n"
 
 @router.post("/chat")
 async def chat(request: ChatRequest):
@@ -69,48 +50,26 @@ async def chat(request: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/breaker")
-async def problem_breaker(request: BreakerRequest):
-    try:
-        breaker = AIBreaker()
-        response = await breaker.process_request(request)
-        return response
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/solver")
-async def problem_solver(request: SolverRequest):
-    try:
-        solver = Solver()
-        response = await solver.solve(request)
-        return response
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/round")
-async def round_stream_endpoint(request: BreakerRequest):
+@router.post("/round_context")
+async def round_context_endpoint(request: BreakerRequest):
     """
-    Stream endpoint for processing problems and generating solutions
+    带有上下文历史的流式处理端点，用于处理问题并生成解决方案
     
     Args:
-        request: BreakerRequest containing problem details
+        request: BreakerRequest 包含问题详情和上下文信息
         
     Returns:
-        StreamingResponse containing solutions
+        StreamingResponse 包含解决方案流
     """
     try:
-        if not request.originalInput:
-            raise HTTPException(
-                status_code=422,
-                detail="Original input is required"
-            )
-            
+        client = get_db_client()
         return StreamingResponse(
-            stream_sse_events(
+            stream_context_events(
                 problem=request.originalInput,
+                client=client,
                 follow_up_question=request.followUpQuestion,
-                metadata=request.metadata
+                metadata=request.metadata,
+                parent_id=request.metadata.get('parent_id') if request.metadata else None
             ),
             media_type="text/event-stream"
         )
@@ -118,21 +77,24 @@ async def round_stream_endpoint(request: BreakerRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-async def stream_sse_events(
+async def stream_context_events(
     problem: str,
+    client,
     follow_up_question: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
+    parent_id: Optional[str] = None
 ):
     """
-    Generate SSE events from the round_stream generator
+    从 round_stream 生成器生成带有上下文的 SSE 事件
     """
     try:
         async for event in round_stream(
             problem=problem,
+            client=client,
             follow_up_question=follow_up_question,
-            metadata=metadata
+            metadata=metadata,
+            parent_id=parent_id
         ):
-
             event_type = event["event"]
             data = json.dumps(event["data"])
             yield f"event: {event_type}\ndata: {data}\n\n"
@@ -140,5 +102,3 @@ async def stream_sse_events(
     except Exception as e:
         error_data = json.dumps({"error": str(e)})
         yield f"event: error\ndata: {error_data}\n\n"
-        
-        

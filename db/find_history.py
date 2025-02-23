@@ -22,28 +22,24 @@ async def get_solution_history(parent_id: str, client: AsyncIOMotorClient) -> Li
     
     while current_id is not None:
         try:
-            # 如果是UUID格式，转换为ObjectId格式
-            if len(current_id) == 36:  # UUID格式的长度
+            if len(current_id) == 36:
                 hex_id = uuid.UUID(current_id).hex[:24]
                 current_id = hex_id
             
-            # 使用传入的client实例
             db = client['nodetree']
             collection = db['nodes']
             solution = await collection.find_one({"_id": ObjectId(current_id)})
             
             if solution:
-                # 确保返回的解决方案包含正确格式的id字段
+
                 if '_id' in solution:
-                    # 将ObjectId转换回UUID格式
                     solution['id'] = current_id if len(current_id) == 36 else str(solution['_id'])
                 history.append(solution)
                 current_id = solution.get('parent_id')
                 
-                # 如果parent_id是ObjectId格式，转换为UUID格式
+
                 if current_id and not len(current_id) == 36:
                     try:
-                        # 将ObjectId扩展为UUID格式
                         current_id = str(uuid.UUID(current_id + '0' * 12))
                     except ValueError:
                         logger.error(f"Error converting ObjectId to UUID: {current_id}")
@@ -54,7 +50,14 @@ async def get_solution_history(parent_id: str, client: AsyncIOMotorClient) -> Li
             logger.error(f"Error getting solution history: {str(e)}")
             break
     
-    return list(reversed(history))
+
+    sorted_history = sorted(
+        history,
+        key=lambda x: x.get('priority', 0),
+        reverse=True
+    )
+    
+    return sorted_history
 
 async def save_solution(solution_data: Dict[str, Any], client: AsyncIOMotorClient) -> Optional[str]:
     """

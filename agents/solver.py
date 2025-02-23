@@ -63,15 +63,12 @@ class Solver(LiteLLMWrapper):
 
     def _get_user_prompt(self, subProblem: SubProblem, id: str = "", context: Optional[Dict] = None) -> str:
         """
-        Generate user prompt
+        Generate user prompt with relevant context
         
         Args:
             subProblem: Sub-problem object
-            id: Optional identifier string, defaults to empty string
-            context: Optional context dictionary containing relevant information
-            
-        Returns:
-            Formatted prompt string
+            id: Optional identifier string
+            context: Optional context dictionary containing solution history
         """
         base_prompt = f"""Please solve the following sub-problem:
 
@@ -80,12 +77,27 @@ Description: {subProblem.description}
 Objective: {subProblem.objective}"""
 
         if context:
-            context_str = "\nContext Information:\n"
-            for key, value in context.items():
-                context_str += f"{key}: {value}\n"
-            base_prompt += context_str
 
-        base_prompt += "\nPlease provide a complete solution, including code examples and detailed explanations. Make sure your answer follows the format specified in the system prompt."
+            if context.get("originalProblem"):
+                base_prompt += f"\n\nOriginal Problem: {context['originalProblem']}"
+            if context.get("followUpQuestion"):
+                base_prompt += f"\n\nFollow-up Question: {context['followUpQuestion']}"
+            
+            # Extract only the most recent parent node solution from the history
+            if context.get("solutionHistory"):
+                history = context["solutionHistory"]
+                if history:
+                    latest_solution = history[-1]  # Get the latest solution
+                    base_prompt += "\n\nPrevious Solution Context:"
+                    base_prompt += f"\nTitle: {latest_solution.get('title', '')}"
+                    base_prompt += f"\nProblem: {latest_solution.get('problem', '')}"
+                    # Only include the key part of the solution
+                    solution_content = latest_solution.get('solution', '')
+                    if len(solution_content) > 1000:  # If the content is too long, only take the first 1000 characters
+                        solution_content = solution_content[:1000] + "..."
+                    base_prompt += f"\nSolution Summary: {solution_content}"
+
+        base_prompt += "\n\nPlease provide a solution that builds upon the previous context while addressing the current problem. Focus on practical implementation details and ensure your answer is in the specified language."
         
         return base_prompt
 
@@ -144,7 +156,7 @@ Objective: {subProblem.objective}"""
             request: Solver request
             
         Returns:
-            求解响应
+            Solver response
         """
         return await self.solve_subproblem(request)
 
