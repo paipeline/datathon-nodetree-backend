@@ -2,3 +2,4 @@ litellm
 python-dotenv 
 fastapi
 uvicorn
+cachebox

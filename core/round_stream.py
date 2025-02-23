@@ -26,7 +26,6 @@ async def round_stream(
         metadata={"language": metadata.get('language', 'English')}
     )
 
-    # 获取问题分解但不输出
     breakdown = await breaker.process_request(breaker_request)
     
     solutions = []
