@@ -51,8 +51,10 @@ def pmc_scrapy(URL):
         if free_article:
             if free_article.get_text() == "Free PMC article." :
                 element = cit.find('span', class_='citation-part')
-                pid = element.find('span', class_='docsum-pmid').get_text().strip()
-                pmid_array.append(pid)
+                pid = element.find('span', class_='docsum-pmid')
+                if pid:
+                    pid = pid.get_text().strip()
+                    pmid_array.append(pid)
     
     return pmid_array
 
@@ -118,9 +120,3 @@ def fetch_full_text_bioc(pmids):
             print(f"Error fetching data for PMID {pmid} (Status Code: {response.status_code})")
 
     return documents
-
-
-
-
-results = scrape("covid", 2)
-print(type(results),results)
