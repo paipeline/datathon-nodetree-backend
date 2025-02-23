@@ -13,3 +13,5 @@ db/crud/__pycache__
 db/find_history/__pycache__
 rag/search/__pycache__
 rag/search/index/__pycache__
+rag/Chroma/*
+rag/Chroma.zip
