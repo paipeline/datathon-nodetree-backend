@@ -25,7 +25,6 @@ async def get_solution_history(parent_id: str, client: AsyncIOMotorClient) -> Li
             if len(current_id) == 36:
                 hex_id = uuid.UUID(current_id).hex[:24]
                 current_id = hex_id
-            
             db = client['nodetree']
             collection = db['nodes']
             solution = await collection.find_one({"_id": ObjectId(current_id)})
@@ -54,7 +53,7 @@ async def get_solution_history(parent_id: str, client: AsyncIOMotorClient) -> Li
 
     sorted_history = sorted(
         history,
-        key=lambda x: x.get('priority', 0),
+        key=lambda x: (x.get('priority', 0), -history.index(x)),
         reverse=True
     )
     
