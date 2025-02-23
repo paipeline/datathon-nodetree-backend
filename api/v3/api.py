@@ -13,6 +13,7 @@ from agents.breaker import AIBreaker, BreakerRequest
 from agents.solver import Solver, SolverRequest
 from core.round_history_steam import round_stream
 from agents.llm import LiteLLMWrapper
+from rag.run import search_documents
 
 load_dotenv()
 
@@ -111,13 +112,18 @@ async def round_context_endpoint(request: BreakerRequest):
     """
     try:
         client = get_db_client()
+        
+
+        relevant_docs = search_documents(request.originalInput, k=2)
+        
         return StreamingResponse(
             stream_context_events(
                 problem=request.originalInput,
                 client=client,
                 follow_up_question=request.followUpQuestion,
                 metadata=request.metadata,
-                parent_id=request.metadata.get('parent_id') if request.metadata else None
+                parent_id=request.metadata.get('parent_id') if request.metadata else None,
+                relevant_docs=relevant_docs
             ),
             media_type="text/event-stream"
         )
@@ -130,18 +136,27 @@ async def stream_context_events(
     client,
     follow_up_question: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
-    parent_id: Optional[str] = None
+    parent_id: Optional[str] = None,
+    relevant_docs: Optional[List] = None
 ):
     """
     Generates SSE events with context from the round_stream generator
     """
     try:
+        context = ""
+        if relevant_docs:
+            context = "Based on the following relevant research (top 2 most relevant documents):\n\n"
+            for metadata, content in relevant_docs:
+                context += f"From '{metadata.get('title', 'Untitled')}' by {metadata.get('authors', 'Unknown Authors')}:\n"
+                context += f"{content}\n\n"
+        
         async for event in round_stream(
             problem=problem,
             client=client,
             follow_up_question=follow_up_question,
             metadata=metadata,
-            parent_id=parent_id
+            parent_id=parent_id,
+            additional_context=context  # 传递额外的上下文
         ):
             event_type = event["event"]
             data = json.dumps(event["data"])
@@ -150,5 +165,4 @@ async def stream_context_events(
     except Exception as e:
         error_data = json.dumps({"error": str(e)})
         yield f"event: error\ndata: {error_data}\n\n"
-
 

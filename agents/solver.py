@@ -77,7 +77,6 @@ Description: {subProblem.description}
 Objective: {subProblem.objective}"""
 
         if context:
-
             if context.get("originalProblem"):
                 base_prompt += f"\n\nOriginal Problem: {context['originalProblem']}"
             if context.get("followUpQuestion"):
@@ -91,11 +90,16 @@ Objective: {subProblem.objective}"""
                     base_prompt += "\n\nPrevious Solution Context:"
                     base_prompt += f"\nTitle: {latest_solution.get('title', '')}"
                     base_prompt += f"\nProblem: {latest_solution.get('problem', '')}"
-                    # Only include the key part of the solution
+
                     solution_content = latest_solution.get('solution', '')
                     if len(solution_content) > 1000:  # If the content is too long, only take the first 1000 characters
                         solution_content = solution_content[:1000] + "..."
                     base_prompt += f"\nSolution Summary: {solution_content}"
+
+            if hasattr(subProblem, 'metadata') and subProblem.metadata and 'similar_contexts' in subProblem.metadata:
+                base_prompt += "\n\nRelevant research context (top 2 most similar documents):\n"
+                for doc in subProblem.metadata['similar_contexts'][:2]:
+                    base_prompt += f"\nDocument content: {doc}\n"
 
         base_prompt += "\n\nPlease provide a solution that builds upon the previous context while addressing the current problem. Focus on practical implementation details and ensure your answer is in the specified language."
         

@@ -116,20 +116,21 @@ def search_documents(query: str, k: int = 3) -> list[tuple[dict, str]]:
 
 if __name__ == "__main__":
   # Test the search_documents function
-  query = "What is the impact of stress on health?"
-  results = search_documents(query, k=3)
-  print(results)
-  # Generate the data store
-  keyword_list = ['health policy', 'healthcare costs', 'disease prediction', 
-                  'risk factors for diseases', 'cardiovascular disease management', 
-                  'AI-driven disease diagnosis', 'FDA-approved drugs', 
-                  'depression and anxiety treatment', 'diabetes treatment', 
-                  'opioid crisis and management', 'predictive analytics in healthcare', 
-                  'infectious disease outbreaks', 'early disease detection', 
-                  'large language models in healthcare', 'COVID-19 treatments', 
-                  'pharmaceutical regulations', 'Medicaid and Medicare data', 
-                  'antibiotic resistance', 'diabetes', 'Alzheimer', 'lung cancer', 
-                  'impact of stress on health']
-  for key in keyword_list:
-    generate_data_store(key, 200)
-  retrieved_docs = db.similarity_search("I want to know the impact of stress on health", k=3)
+  # query = "What is the impact of stress on health?"
+  # results = search_documents(query, k=3)
+  # print(results)
+  # # Generate the data store
+  # keyword_list = ['health policy', 'healthcare costs', 'disease prediction', 
+  #                 'risk factors for diseases', 'cardiovascular disease management', 
+  #                 'AI-driven disease diagnosis', 'FDA-approved drugs', 
+  #                 'depression and anxiety treatment', 'diabetes treatment', 
+  #                 'opioid crisis and management', 'predictive analytics in healthcare', 
+  #                 'infectious disease outbreaks', 'early disease detection', 
+  #                 'large language models in healthcare', 'COVID-19 treatments', 
+  #                 'pharmaceutical regulations', 'Medicaid and Medicare data', 
+  #                 'antibiotic resistance', 'diabetes', 'Alzheimer', 'lung cancer', 
+  #                 'impact of stress on health']
+  # for key in keyword_list:
+  #   generate_data_store(key, 200)
+  retrieved_docs = db.similarity_search("I want to know the impact of stress on health?", k=3)
+  print(retrieved_docs)
