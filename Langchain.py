@@ -12,8 +12,27 @@ import requests
 import feedparser
 import tempfile
 import PyPDF2
+import math
 
 from load_documents import load_documents
+
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Path to the directory to save Chroma database
+CHROMA_PATH = "chroma"
+
+# Ensure the database directory exists
+if not os.path.exists(CHROMA_PATH):
+    os.makedirs(CHROMA_PATH)  # Create the directory if it doesn't exist
+    print(f"Created directory: {CHROMA_PATH}")
+
+embeddings = OpenAIEmbeddings(
+    model="text-embedding-ada-002", 
+    disallowed_special=()  # Allow all special tokens
+)
+
+db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
 
 def split_text(documents: list[Document]):
   """
@@ -33,18 +52,16 @@ def split_text(documents: list[Document]):
 
   # Split documents into smaller chunks using text splitter
   chunks = text_splitter.split_documents(documents)
-  print(f"Split {len(documents)} documents into {len(chunks)} chunks.")
+  # print(f"Split {len(documents)} documents into {len(chunks)} chunks.")
 
   # Print example of page content and metadata for a chunk
-  document = chunks[0]
-  print(document.page_content)
-  print(document.metadata)
+  # document = chunks[0]
+  # print(document.page_content)
+  # print(document.metadata)
 
   return chunks
 
-# Path to the directory to save Chroma database
-CHROMA_PATH = "chroma"
-def save_to_chroma(chunks: list[Document]):
+def save_to_chroma(chunks: list[Document], batch_size=400):
   """
   Save the given list of Document objects to a Chroma database.
   Args:
@@ -53,21 +70,17 @@ def save_to_chroma(chunks: list[Document]):
   None
   """
 
-  # Clear out the existing database directory if it exists
-  if os.path.exists(CHROMA_PATH):
-    shutil.rmtree(CHROMA_PATH)
+  # # Clear out the existing database directory if it exists
+  # if os.path.exists(CHROMA_PATH):
+  #   shutil.rmtree(CHROMA_PATH)
 
-  # Create a new Chroma database from the documents using OpenAI embeddings
-  db = Chroma.from_documents(
-    chunks,
-    OpenAIEmbeddings(),
-    persist_directory=CHROMA_PATH
-  )
-
-  # Persist the database to disk
-  db.persist()
-  print(f"Saved {len(chunks)} chunks to {CHROMA_PATH}.")
-  return db
+  num_batches = math.ceil(len(chunks) / batch_size)
+    
+  for i in range(num_batches):
+    batch = chunks[i * batch_size : (i + 1) * batch_size]
+    db.add_documents(batch)
+    db.persist()
+  print('Finish saving')
 
 def generate_data_store(query, max_results):
   """
@@ -75,12 +88,23 @@ def generate_data_store(query, max_results):
   """
   documents = load_documents(query, max_results) # Load documents from a source
   chunks = split_text(documents) # Split documents into manageable chunks
-  db = save_to_chroma(chunks) # Save the processed data to a data store
-  return db
+  save_to_chroma(chunks) # Save the processed data to a data store
+  # return db
 
 # Generate the data store
-db = generate_data_store("machine learning in healthcare", 3)
-retrieved_docs = db.similarity_search("machine learning applications in healthcare", k=3)
-for doc in retrieved_docs:
-    print(f"Metadata: {doc.metadata}")
-    print(f"Content: {doc.page_content[:300]}...")  # Print first 300 characters
+keyword_list = ['health policy', 'healthcare costs', 'disease prediction', 
+                'risk factors for diseases', 'cardiovascular disease management', 
+                'AI-driven disease diagnosis', 'FDA-approved drugs', 
+                'depression and anxiety treatment', 'diabetes treatment', 
+                'opioid crisis and management', 'predictive analytics in healthcare', 
+                'infectious disease outbreaks', 'early disease detection', 
+                'large language models in healthcare', 'COVID-19 treatments', 
+                'pharmaceutical regulations', 'Medicaid and Medicare data', 
+                'antibiotic resistance', 'diabetes', 'Alzheimer', 'lung cancer', 
+                'impact of stress on health']
+for key in keyword_list:
+  generate_data_store(key, 200)
+# retrieved_docs = db.similarity_search("machine learning applications in healthcare", k=3)
+# for doc in retrieved_docs:
+#     print(f"Metadata: {doc.metadata}")
+#     print(f"Content: {doc.page_content[:300]}...")  # Print first 300 characters

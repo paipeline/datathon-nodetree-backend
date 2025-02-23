@@ -24,7 +24,7 @@ def scrape(keywords, limit):
     while len(pmid_total) < limit:
         page += 1
         URL = f"https://pubmed.ncbi.nlm.nih.gov/?term={keywords}&size=50&page={page}"
-        print(URL)
+        # print(URL)
         pmid_list = pmc_scrapy(URL)
         pmid_total +=  pmid_list
         # print(len(pmid_total))
@@ -115,7 +115,8 @@ def fetch_full_text_bioc(pmids):
                 )
 
             except json.JSONDecodeError:
-                print(f"Failed to decode JSON for PMID {pmid}")
+                # print(f"Failed to decode JSON for PMID {pmid}")
+                pass
         else:
             print(f"Error fetching data for PMID {pmid} (Status Code: {response.status_code})")
 
