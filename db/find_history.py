@@ -40,6 +40,7 @@ async def get_solution_history(parent_id: str, client: AsyncIOMotorClient) -> Li
 
                 if current_id and not len(current_id) == 36:
                     try:
+                        # 将ObjectId扩展为UUID格式
                         current_id = str(uuid.UUID(current_id + '0' * 12))
                     except ValueError:
                         logger.error(f"Error converting ObjectId to UUID: {current_id}")
@@ -71,15 +72,12 @@ async def save_solution(solution_data: Dict[str, Any], client: AsyncIOMotorClien
         Optional[str]: 成功时返回解决方案ID，失败时返回None
     """
     try:
-        # 生成新的UUID如果没有的话
         if 'id' not in solution_data:
             solution_data['id'] = str(uuid.uuid4())
         
-        # 转换UUID为MongoDB的ObjectId
         hex_id = uuid.UUID(solution_data['id']).hex[:24]
         solution_data['_id'] = ObjectId(hex_id)
-        
-        # 获取MongoDB集合
+    
         db = client['nodetree']
         collection = db['nodes']
         
@@ -96,7 +94,6 @@ async def save_solution(solution_data: Dict[str, Any], client: AsyncIOMotorClien
         if result.acknowledged:
             logger.info(f"Modified count: {result.modified_count}, Upserted ID: {result.upserted_id}")
             
-            # 验证保存是否成功
             saved_solution = await collection.find_one({'_id': solution_data['_id']})
             if saved_solution:
                 logger.info(f"Successfully verified solution save with ID: {solution_data['id']}")

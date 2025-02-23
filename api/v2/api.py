@@ -6,6 +6,8 @@ import json
 import os
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
+import uuid
+from bson.objectid import ObjectId
 
 from agents.breaker import AIBreaker, BreakerRequest
 from agents.solver import Solver, SolverRequest
@@ -31,6 +33,52 @@ class Message(BaseModel):
     role: str
     content: str
 
+class PriorityUpdateRequest(BaseModel):
+    id: str
+    priority: int
+
+@router.post("/set-priority")
+async def set_priority(request: PriorityUpdateRequest):
+    """
+    Updates the priority of a node
+    
+    Args:
+        request: Request containing node ID and new priority
+        
+    Returns:
+        Updated node data
+    """
+    try:
+        client = get_db_client()
+        db = client['nodetree']
+        collection = db['nodes']
+        
+        hex_id = uuid.UUID(request.id).hex[:24]
+        object_id = ObjectId(hex_id)
+        
+        result = await collection.update_one(
+            {'_id': object_id},
+            {'$set': {'priority': request.priority}}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="Node not found")
+            
+        updated_node = await collection.find_one({'_id': object_id})
+        if not updated_node:
+            raise HTTPException(status_code=404, detail="Node not found")
+            
+        updated_node['id'] = request.id
+        updated_node['_id'] = updated_node['id']
+        
+        return {
+            "success": True,
+            "node": updated_node
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/chat")
 async def chat(request: ChatRequest):
     try:
@@ -53,13 +101,13 @@ async def chat(request: ChatRequest):
 @router.post("/round_context")
 async def round_context_endpoint(request: BreakerRequest):
     """
-    带有上下文历史的流式处理端点，用于处理问题并生成解决方案
+    Endpoint for streaming processing with context history, used for processing questions and generating solutions
     
     Args:
-        request: BreakerRequest 包含问题详情和上下文信息
+        request: BreakerRequest containing question details and context information
         
     Returns:
-        StreamingResponse 包含解决方案流
+        StreamingResponse containing solution streams
     """
     try:
         client = get_db_client()
@@ -85,7 +133,7 @@ async def stream_context_events(
     parent_id: Optional[str] = None
 ):
     """
-    从 round_stream 生成器生成带有上下文的 SSE 事件
+    Generates SSE events with context from the round_stream generator
     """
     try:
         async for event in round_stream(

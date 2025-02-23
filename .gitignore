@@ -7,3 +7,9 @@ utils/__pycache__
 agents/__pycache__
 api/__pycache__
 api/v1/__pycache__
+db/__pycache__
+core/__pycache__
+db/crud/__pycache__
+db/find_history/__pycache__
+rag/search/__pycache__
+rag/search/index/__pycache__

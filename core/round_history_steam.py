@@ -20,6 +20,7 @@ def serialize_solution(solution: Dict[str, Any]) -> Dict[str, Any]:
     # Directly return the original solution without serialization
     return solution
 
+
 async def round_stream(
     problem: str,
     client,  # MongoDB client instance
