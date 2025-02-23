@@ -24,6 +24,11 @@ class AutoscalingResponse(BaseModel):
     solutions: Dict[str, Any]
     metadata: Optional[Dict[str, Any]] = None
 
+class ChatRequest(BaseModel):
+    messages: list
+    temperature: Optional[float] = 0.7
+    model: Optional[str] = "gpt-4o-mini"
+
 async def stream_solutions(problem_breakdown: Dict[str, Any]):
     try:
         num_solvers = await round_stream(problem_breakdown)
@@ -121,3 +126,23 @@ async def stream_sse_events(
     except Exception as e:
         error_data = json.dumps({"error": str(e)})
         yield f"event: error\ndata: {error_data}\n\n"
+
+@router.post("/chat")
+async def chat(request: ChatRequest):
+    try:
+        llm = LiteLLMWrapper(
+            model=request.model,
+            temperature=request.temperature
+        )
+        
+        system_message = {
+            "role": "system",
+            "content": "返回数学公式的时候需要额外添加$$符号包裹latex公式"
+        }
+        
+        messages = [system_message] + request.messages
+        response = llm.chat(messages=messages)
+        
+        return {"success": True, "content": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

@@ -38,7 +38,7 @@ class subProblem(BaseModel):
     objective: str
 
     def to_dict(self) -> Dict:
-        """将子问题转换为字典格式"""
+        """Convert the subproblem to a dictionary"""
         return self.model_dump()
 
 
@@ -95,7 +95,6 @@ Return your output in the exact JSON format:
             Dictionary containing the breakdown results
         """
         try:
-            # 从metadata中获取语言设置
             if request.metadata and isinstance(request.metadata, dict):
                 self.language = request.metadata.get("language", "Chinese")
             
